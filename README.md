@@ -112,10 +112,10 @@ git commit -m "Bump Node headers to v22.6.0"
   tagged, since native addons may pin to any exact version. Adjust
   `MIN_MAJOR` in the workflow's default input if you want a different
   floor.
-- **Tarball format:** this uses the `.tar.gz` headers tarball
-  (`node-vX.Y.Z-headers.tar.gz`), which is available for every version.
-  The `.tar.xz` variant only exists for newer releases, so `.tar.gz` is
-  the safe universal choice.
+- **Tarball format:** this tries the `.tar.xz` headers tarball
+  (`node-vX.Y.Z-headers.tar.xz`) first — it's ~100 KB vs ~10 MB for the
+  gzip variant — and falls back to `.tar.gz` when `.tar.xz` is unavailable
+  (older releases).
 - **Repo size over time:** because each tag is an orphan commit, `git
   clone` **without** `--depth`/`--single-branch` will still eventually
   pull all objects reachable from all tags (git doesn't prune history you

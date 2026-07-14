@@ -62,9 +62,16 @@ while IFS= read -r VERSION; do
     continue
   fi
 
-  URL="https://nodejs.org/dist/v${VERSION}/node-v${VERSION}-headers.tar.gz"
+  URL_XZ="https://nodejs.org/dist/v${VERSION}/node-v${VERSION}-headers.tar.xz"
+  URL_GZ="https://nodejs.org/dist/v${VERSION}/node-v${VERSION}-headers.tar.gz"
 
-  if ! curl "${CURL_OPTS[@]}" -I "$URL" > /dev/null 2>&1; then
+  if curl "${CURL_OPTS[@]}" -I "$URL_XZ" > /dev/null 2>&1; then
+    URL="$URL_XZ"
+    TAR_FLAG="-xJf"
+  elif curl "${CURL_OPTS[@]}" -I "$URL_GZ" > /dev/null 2>&1; then
+    URL="$URL_GZ"
+    TAR_FLAG="-xzf"
+  else
     log "No headers tarball for v$VERSION (skipping, e.g. too old or unreleased on this channel)"
     continue
   fi
@@ -78,13 +85,13 @@ while IFS= read -r VERSION; do
   fi
 
   WORKDIR="$(mktemp -d)"
-  TARBALL="$WORKDIR/headers.tar.gz"
+  TARBALL="$WORKDIR/headers.tar.xz"
   EXTRACT_DIR="$WORKDIR/extract"
   WORKTREE_DIR="$WORKDIR/wt"
 
   mkdir -p "$EXTRACT_DIR"
   curl "${CURL_OPTS[@]}" -L "$URL" -o "$TARBALL"
-  tar -xzf "$TARBALL" -C "$EXTRACT_DIR" --strip-components=1
+  tar $TAR_FLAG "$TARBALL" -C "$EXTRACT_DIR" --strip-components=1
 
   # Record provenance
   cat > "$EXTRACT_DIR/.node-headers-source.json" <<EOF
