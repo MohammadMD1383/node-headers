@@ -14,8 +14,31 @@ on:
         required: false
         default: '18'
 
+permissions:
+  contents: write
+
+concurrency:
+  group: node-headers-sync
+  cancel-in-progress: false
+
 jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
-      - run: echo hello
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install jq
+        run: sudo apt-get update -y && sudo apt-get install -y jq
+
+      - name: Run sync
+        env:
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+          MIN_MAJOR: ${{ github.event.inputs.min_major || '18' }}
+          GIT_AUTHOR_NAME: node-headers-bot
+          GIT_AUTHOR_EMAIL: node-headers-bot@users.noreply.github.com
+          GIT_COMMITTER_NAME: node-headers-bot
+          GIT_COMMITTER_EMAIL: node-headers-bot@users.noreply.github.com
+        run: bash scripts/sync.sh
