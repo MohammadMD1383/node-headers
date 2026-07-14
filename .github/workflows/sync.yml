@@ -1,6 +1,16 @@
 name: Sync Node.js headers
 
-on: [workflow_dispatch]
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (no commits/tags/push)'
+        required: false
+        default: 'false'
+      min_major:
+        description: 'Lowest major Node version to include'
+        required: false
+        default: '18'
 
 jobs:
   sync:
