@@ -33,10 +33,12 @@ BOT_EMAIL="node-headers-bot@users.noreply.github.com"
 
 log() { echo "[sync] $*" >&2; }
 
+CURL_OPTS=(-sf --retry 3 --retry-delay 5 --connect-timeout 30)
+
 command -v jq >/dev/null || { log "jq is required"; exit 1; }
 
 log "Fetching Node.js release index..."
-INDEX_JSON="$(curl -sf https://nodejs.org/dist/index.json)"
+INDEX_JSON="$(curl "${CURL_OPTS[@]}" https://nodejs.org/dist/index.json)"
 
 log "Fetching existing tags..."
 git fetch --tags --force --quiet || true
@@ -62,7 +64,7 @@ while IFS= read -r VERSION; do
 
   URL="https://nodejs.org/dist/v${VERSION}/node-v${VERSION}-headers.tar.gz"
 
-  if ! curl -sfI "$URL" > /dev/null 2>&1; then
+  if ! curl "${CURL_OPTS[@]}" -I "$URL" > /dev/null 2>&1; then
     log "No headers tarball for v$VERSION (skipping, e.g. too old or unreleased on this channel)"
     continue
   fi
@@ -81,7 +83,7 @@ while IFS= read -r VERSION; do
   WORKTREE_DIR="$WORKDIR/wt"
 
   mkdir -p "$EXTRACT_DIR"
-  curl -sfL "$URL" -o "$TARBALL"
+  curl "${CURL_OPTS[@]}" -L "$URL" -o "$TARBALL"
   tar -xzf "$TARBALL" -C "$EXTRACT_DIR" --strip-components=1
 
   # Record provenance
