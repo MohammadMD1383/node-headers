@@ -1,124 +1,110 @@
-# node-headers
+<div align="center">
 
-A git mirror of official Node.js header tarballs (`node-vX.Y.Z-headers.tar.gz`),
-one **git tag per Node.js version**, so native addon projects can pin their
-header dependency with a plain `git submodule` — no installers, no
-`node-gyp` network fetch, no extra tooling.
+# 📦 node-headers
 
-## How it works
+**Zero-install Node.js C/C++ headers for native addons**  
+One `git tag` per version · Auto-synced · Plain `git submodule`
 
-- `scripts/sync.sh` reads `https://nodejs.org/dist/index.json`, compares it
-  against the tags already in this repo, and for every missing version:
-  downloads that version's headers tarball, extracts it, commits it as an
-  **orphan commit** (no shared history with other versions), and tags it
-  `vX.Y.Z`.
-- `.github/workflows/sync.yml` runs that script every 6 hours (and on manual
-  dispatch), so new Node.js releases show up as new tags automatically,
-  with zero manual steps after setup.
-- Orphan commits mean each tag is essentially an independent snapshot. A
-  consumer who shallow-fetches a single tag only downloads that version's
-  headers — not the accumulated history of every version ever added.
+  <a href="https://github.com/MohammadMD1383/node-headers/actions/workflows/sync.yml">
+    <img src="https://github.com/MohammadMD1383/node-headers/actions/workflows/sync.yml/badge.svg" alt="Sync status">
+  </a>
+  <a href="https://github.com/MohammadMD1383/node-headers/blob/main/LICENSE">
+    <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT">
+  </a>
+  <img src="https://img.shields.io/github/v/tag/MohammadMD1383/node-headers?label=latest" alt="Latest tag">
+  <img src="https://img.shields.io/badge/node-%3E%3D18-339933" alt="Node >= 18">
+</div>
 
-## One-time setup (do this once)
+---
 
-1. **Create the repo** on GitHub (e.g. `you/node-headers`), empty, with no
-   README/license auto-generated (or delete their initial commit — it
-   doesn't matter, `sync.sh` doesn't depend on any existing branch content).
+## ✨ Why?
 
-2. **Clone it locally** and copy in these files (`scripts/sync.sh`,
-   `.github/workflows/sync.yml`, this `README.md`):
+Native Node.js addons (C/C++ modules) need the Node.js headers to compile. The standard approach — `node-gyp install` — downloads headers on every build, requires Python and a build toolchain, and pulls from the network every time.
 
-   ```bash
-   git clone https://github.com/you/node-headers.git
-   cd node-headers
-   # copy scripts/, .github/, README.md in here
-   chmod +x scripts/sync.sh
-   git add .
-   git commit -m "Add sync automation"
-   git push origin main
-   ```
+**This repo is a better way:** it's a git mirror of official Node.js headers, one tag per version. Consume it with a `git submodule` and your build system just needs the headers on disk — no network fetch, no extra tooling, no CI surprises.
 
-3. **Bootstrap the historical versions (v18 → now).** This is the exact
-   same script the workflow runs later — you're just running it once by
-   hand to seed history:
-
-   ```bash
-   # requires: git, curl, jq, tar (all standard on macOS/Linux; on Windows use WSL)
-   MIN_MAJOR=18 bash scripts/sync.sh
-   ```
-
-   This will take a while the first time (it's downloading and tagging
-   every released version from Node 18 onward — likely 100+ tags). It
-   pushes tags as it goes via `git push origin --tags` at the end.
-
-   Want to sanity-check first without pushing anything?
-
-   ```bash
-   DRY_RUN=true MIN_MAJOR=18 bash scripts/sync.sh
-   ```
-
-4. **Enable Actions write permissions**, since the workflow needs to push
-   tags: in the repo, go to **Settings → Actions → General → Workflow
-   permissions**, and select **"Read and write permissions"**. (The
-   `permissions: contents: write` block in the workflow file requests this,
-   but the repo-level setting must also allow it.)
-
-5. **Push the workflow file** (if you haven't already) — as soon as it's on
-   the default branch, it starts running on the cron schedule automatically.
-   You can also trigger it manually anytime from the **Actions** tab
-   (`workflow_dispatch`) to confirm it works before waiting for the next
-   scheduled run.
-
-That's it — from this point on, every new Node.js release becomes a new
-tag within 6 hours, with no further action from you.
-
-## Using it in a native addon project
+## 🚀 Quick start
 
 ```bash
-git submodule add https://github.com/you/node-headers.git deps/node-headers
+# Add as a submodule
+git submodule add https://github.com/MohammadMD1383/node-headers.git deps/node-headers
+
+# Pin to a specific Node.js version (shallow — one version only)
 cd deps/node-headers
 git fetch --depth 1 origin v22.5.1
 git checkout v22.5.1
 cd ../..
+
+# Keep it shallow for future updates
+git config -f .gitmodules submodule.deps/node-headers.shallow true
+
+# Commit the pin
 git add .gitmodules deps/node-headers
 git commit -m "Pin Node headers to v22.5.1"
 ```
 
-Then point your build at `deps/node-headers/include/node` (e.g. in
-`binding.gyp`'s `include_dirs`, or your CMake `include_directories`).
-
-To keep the submodule fetch shallow (recommended — avoids pulling every
-other version's headers), configure it once:
-
-```bash
-git config -f .gitmodules submodule.deps/node-headers.shallow true
+Then in your `binding.gyp`, `CMakeLists.txt`, or equivalent:
+```makefile
+include_dirs: ["deps/node-headers/include/node"]
 ```
 
-Bumping to a new Node version later is then just:
+**Bumping to a newer Node version later:**
 
 ```bash
 cd deps/node-headers
-git fetch --depth 1 origin v22.6.0
-git checkout v22.6.0
+git fetch --depth 1 origin v23.4.0
+git checkout v23.4.0
 cd ../..
 git add deps/node-headers
-git commit -m "Bump Node headers to v22.6.0"
+git commit -m "Bump Node headers to v23.4.0"
 ```
 
-## Notes / things to decide for your fork
+## 🔄 How it works
 
-- **Which versions get included:** by default `MIN_MAJOR=18` and every
-  released version (LTS and non-LTS, e.g. odd majors like 19/21/23) is
-  tagged, since native addons may pin to any exact version. Adjust
-  `MIN_MAJOR` in the workflow's default input if you want a different
-  floor.
-- **Tarball format:** this tries the `.tar.xz` headers tarball
-  (`node-vX.Y.Z-headers.tar.xz`) first — it's ~100 KB vs ~10 MB for the
-  gzip variant — and falls back to `.tar.gz` when `.tar.xz` is unavailable
-  (older releases).
-- **Repo size over time:** because each tag is an orphan commit, `git
-  clone` **without** `--depth`/`--single-branch` will still eventually
-  pull all objects reachable from all tags (git doesn't prune history you
-  haven't asked it to skip). Consumers should always use `git fetch
-  --depth 1 origin <tag>` as shown above, not a plain `git submodule add`
-  default clone, to avoid downloading every version.
+- Every 6 hours, [a GitHub Actions workflow](.github/workflows/sync.yml) checks `https://nodejs.org/dist/index.json` for new releases.
+- For each new version, it downloads the headers tarball (`.tar.xz` when available — ~100 KB instead of ~10 MB), commits it as an **orphan commit**, and tags it `vX.Y.Z`.
+- **Orphan commits** mean each tag is an independent snapshot. A shallow fetch of a single tag downloads only that version's headers — not the entire repo's history.
+
+## 📋 Which versions are included?
+
+**All released versions from Node 18 onward** (v18.0.0 → present), including both LTS and non-LTS (odd majors). This repo currently mirrors **199 versions** and grows with every new Node.js release.
+
+Adjust the floor by setting `MIN_MAJOR` — see [sync.sh](scripts/sync.sh).
+
+## 🌟 Benefits
+
+| Approach | Network | Tooling | Setup time |
+|---|---|---|---|
+| **node-gyp install** | Every build | Requires Python + toolchain | ~30s per build |
+| **npm `@node-rs/headers`** | Per install | Requires npm | ~10s per install |
+| **This repo** | Once per version | None (just git) | Instant |
+
+- ✅ **No Python required** — git + your C/C++ compiler is all you need
+- ✅ **Offline builds** — once fetched, headers are on disk
+- ✅ **CI-friendly** — `git fetch --depth 1` is fast and reliable
+- ✅ **Transparent** — plain files, no abstraction layer
+- ✅ **Air-gap friendly** — mirror the repo once, clone from your internal network
+
+## ⚙️ One-time setup (for your fork)
+
+If you want to run your own mirror:
+
+1. Create an empty repo on GitHub.
+2. Copy in `scripts/sync.sh`, `.github/workflows/sync.yml`, and this `README.md`.
+3. **Enable Actions write permissions** — go to **Settings → Actions → General → Workflow permissions → "Read and write permissions"**.
+4. Seed historical versions:
+   ```bash
+   MIN_MAJOR=18 bash scripts/bootstrap.sh
+   ```
+5. That's it — the cron job handles everything from there.
+
+## 📘 License
+
+The code in this repo (sync scripts, workflows, documentation) is MIT licensed.
+The Node.js headers themselves are copyright of the Node.js contributors and are distributed under the [Node.js license](https://raw.githubusercontent.com/nodejs/node/main/LICENSE) (MIT).
+
+---
+
+<p align="center">
+  <sub>Built with ❤️ for the native addon community · Maintained automatically via GitHub Actions</sub>
+</p>
